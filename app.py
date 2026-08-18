@@ -18,11 +18,18 @@ from forecasting import (  # noqa: E402
 from narrative import (  # noqa: E402
     TYPE_LABELS,
     build_explanation,
+    dairy_growth_factor,
     material_family,
     material_type,
     ppwr_content_factor,
 )
-from pestel_data import PESTEL_CATEGORY, PPWR_RECYCLED_TARGET_2030, PPWR_TARGET_PERIOD, build_pestel_quarterly  # noqa: E402
+from pestel_data import (  # noqa: E402
+    DAIRY_GROWTH_RATE_ANNUAL,
+    PESTEL_CATEGORY,
+    PPWR_RECYCLED_TARGET_2030,
+    PPWR_TARGET_PERIOD,
+    build_pestel_quarterly,
+)
 
 st.set_page_config(page_title="Previsione Domanda PET/PS", layout="wide")
 
@@ -43,9 +50,10 @@ st.caption(
 with st.expander("Metodologia e fonti dei dati PESTEL", expanded=False):
     st.markdown(
         """
-**Dati storici (endogeni)**: consumi mensili di materia prima (kg) per PET VG, SCAGLIA PET,
-DA MAC PET, PS, PS SCAGLIA, PE — aggregati a trimestri completi (ottobre 2021 - giugno 2026).
-Il trimestre in corso, incompleto, viene escluso per non introdurre un crollo artificiale.
+**Dati storici (endogeni)**: consumi mensili di materia prima (convertiti in tonnellate) per
+PET VG, SCAGLIA PET, DA MAC PET, PS, PS SCAGLIA, PE — aggregati a trimestri completi
+(ottobre 2021 - giugno 2026). Il trimestre in corso, incompleto, viene escluso per non
+introdurre un crollo artificiale.
 
 **Regressore economico** (stimato nel modello): prezzo materiale (EUR/kg), dato interno
 aziendale. Prezzo Brent e cambio EUR/USD sono stati volutamente esclusi: per un
@@ -56,15 +64,21 @@ questi effetti macro, e includerli avrebbe saturato il budget di regressori stim
 **Mercato di destinazione (lattiero-caseario)**: l'azienda produce prevalentemente
 imballaggi per yogurt e formaggi freschi. Dati Ismea Mercati/Mordor Intelligence 2025
 mostrano consumi in crescita in queste categorie (yogurt +5,4%, formaggi freschi +4,1%)
-ma anche una spinta strutturale della GDO verso formati senza vassoio/carta. Trattato
-qualitativamente nella sezione "Perché questa previsione?" (nessuna serie numerica
-affidabile per un regressore statistico).
+ma anche una spinta strutturale della GDO verso formati senza vassoio/carta. La crescita
+di volume (media yogurt/formaggi freschi ≈ 4,75%/anno) è inclusa come **leva di scenario
+quantificata** (non stimata nel modello, varianza storica nulla), applicata in egual
+misura a vergine e riciclato perché riflette la crescita del volume totale imballato, non
+uno spostamento di composizione.
 
 **Regressori politico/ambientali**: PPWR in vigore dall'11/02/2025 (Regolamento UE
 2025/40) è stimato nel modello. L'**obbligo di contenuto riciclato PPWR** (30% PCR per il
 PET, 10% per il PS entro il 1/1/2030, Allegato II) e la **Plastic Tax IT** (rinviata al
 01/01/2027) hanno varianza storica nulla nel campione: sono trattati come **leve di
-scenario** applicate alla previsione statistica, non come regressori stimati.
+scenario** applicate alla previsione statistica, non come regressori stimati. A
+differenza della crescita di mercato, l'obbligo PPWR sposta la *composizione* tra
+vergine e riciclato: il riciclato cresce quindi per due effetti che si sommano — la
+crescita del mercato di destinazione E lo spostamento verso il riciclato imposto dalla
+normativa.
 
 **Fattori sociali e tecnologici**: non è stata reperita una serie trimestrale pubblica
 affidabile per consapevolezza ambientale dei consumatori o capacità di riciclo rPET oltre
@@ -127,12 +141,11 @@ horizon_quarters = horizon_years * 4
 
 st.sidebar.subheader("Sensibilità della previsione")
 reattivita = st.sidebar.slider(
-    "Reattività ai fattori di mercato (%)", 0, 200, 100, step=10,
+    "Reattività ai fattori di mercato (%)", 0, 100, 100, step=10,
     help=(
         "0% = previsione ridotta a una retta di tendenza lineare (nessuna stagionalità, nessun "
         "effetto di regressori o scenari PESTEL). 100% = previsione così com'è stimata dal "
-        "modello. >100% = amplifica sia le oscillazioni stagionali sia l'effetto di regressori "
-        "e leve di scenario rispetto alla retta di tendenza."
+        "modello, con i regressori e le leve di scenario a piena intensità."
     ),
 )
 
@@ -140,6 +153,15 @@ st.sidebar.subheader("Scenari PESTEL (aggiustamento post-stima)")
 st.sidebar.caption(
     "Aggiustamenti applicati alla previsione statistica, non stimati nel modello. Il segno "
     "viene invertito automaticamente per i materiali riciclati."
+)
+
+dairy_growth_pct = st.sidebar.slider(
+    "Crescita mercato lattiero-caseario (%/anno)", 0.0, 15.0, DAIRY_GROWTH_RATE_ANNUAL, step=0.25,
+    help=(
+        "Crescita composta annua applicata a tutta la domanda (vergine e riciclato in egual "
+        "misura). Default = media crescita consumi yogurt (+5,4%) e formaggi freschi (+4,1%), "
+        "fonte Ismea Mercati 2025 — le due categorie che usano tipicamente vaschette PET/PS."
+    ),
 )
 
 s0 = current_recycled_share(consumi_q, family) if family in ("PET", "PS") else None
@@ -169,14 +191,14 @@ hist_fig.add_trace(
         x=y.index.to_timestamp().astype(str), y=y.values, mode="lines+markers", name=material
     )
 )
-hist_fig.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="kg")
+hist_fig.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="tonnellate")
 st.plotly_chart(hist_fig, use_container_width=True)
 
 annual_hist = y.copy()
 annual_hist.index = annual_hist.index.year
 annual_hist = annual_hist.groupby(level=0).sum()
 with st.expander("Totali annuali storici (somma trimestri disponibili)"):
-    st.dataframe(annual_hist.rename("kg totali").to_frame())
+    st.dataframe(annual_hist.rename("tonnellate totali").to_frame().style.format("{:,.1f}"))
 
 run = st.button("Genera previsione", type="primary")
 
@@ -198,6 +220,7 @@ if run:
         )
 
         ppwr_factor = ppwr_content_factor(mtype, s0, target_pct, y.index[-1], mean.index)
+        dairy_factor = dairy_growth_factor(dairy_growth_pct, y.index[-1], mean.index)
 
         tax_sign = {"vergine": 1, "riciclato": -1}.get(mtype, 0)
         effective_tax = plastic_tax_impact * tax_sign
@@ -208,7 +231,7 @@ if run:
                 if dt >= tax_start:
                     tax_factor.loc[dt] = 1 + effective_tax / 100
 
-        adj = ppwr_factor * tax_factor
+        adj = ppwr_factor * tax_factor * dairy_factor
         mean_adj = mean * adj
         ci_adj = ci.multiply(adj, axis=0)
 
@@ -217,8 +240,8 @@ if run:
         explanation = build_explanation(
             material=material, y=y, mean=mean_final, res=res, exog_cols=selected_regressors,
             future_exog=future_exog, s0=s0, target_pct=target_pct, ppwr_factor=ppwr_factor,
-            plastic_tax_scenario=plastic_tax_scenario, plastic_tax_impact=plastic_tax_impact,
-            bt_mape=bt["mape"], reactivity_pct=reattivita,
+            dairy_growth_pct=dairy_growth_pct, plastic_tax_scenario=plastic_tax_scenario,
+            plastic_tax_impact=plastic_tax_impact, bt_mape=bt["mape"], reactivity_pct=reattivita,
         )
 
         st.session_state["result"] = dict(
@@ -232,7 +255,7 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
     c1, c2, c3 = st.columns(3)
     c1.metric("Ordine SARIMA scelto", f"{best['order']} x {best['seasonal_order']}")
     c2.metric("MAPE backtest", f"{bt['mape']:.1f}%")
-    c3.metric("RMSE backtest", f"{bt['rmse']:,.0f} kg")
+    c3.metric("RMSE backtest", f"{bt['rmse']:,.1f} t")
 
     st.subheader("Previsione")
     fc_fig = go.Figure()
@@ -254,7 +277,7 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
         )
     )
     fc_fig.add_trace(go.Scatter(x=fc_x, y=mean.values, mode="lines+markers", name="Previsione"))
-    fc_fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="kg")
+    fc_fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="tonnellate")
     st.plotly_chart(fc_fig, use_container_width=True)
 
     st.subheader("Perché questa previsione?")
@@ -267,23 +290,23 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
         "confrontati direttamente con gli anni completi."
     )
     hist_y = r["y"]
-    hist_annual = hist_y.groupby(hist_y.index.year).sum().rename("kg (storico)")
+    hist_annual = hist_y.groupby(hist_y.index.year).sum().rename("t (storico)")
     hist_n = hist_y.groupby(hist_y.index.year).size().rename("trimestri (storico)")
 
-    fc_annual = mean.groupby(mean.index.year).sum().rename("kg (previsione)")
+    fc_annual = mean.groupby(mean.index.year).sum().rename("t (previsione)")
     fc_n = mean.groupby(mean.index.year).size().rename("trimestri (previsione)")
 
     annual_table = pd.concat([hist_n, hist_annual, fc_n, fc_annual], axis=1)
-    annual_table = annual_table[["trimestri (storico)", "kg (storico)", "trimestri (previsione)", "kg (previsione)"]]
+    annual_table = annual_table[["trimestri (storico)", "t (storico)", "trimestri (previsione)", "t (previsione)"]]
     st.dataframe(
         annual_table.style.format(
-            {"kg (storico)": "{:,.0f}", "kg (previsione)": "{:,.0f}",
+            {"t (storico)": "{:,.1f}", "t (previsione)": "{:,.1f}",
              "trimestri (storico)": "{:.0f}", "trimestri (previsione)": "{:.0f}"},
             na_rep="—",
         )
     )
 
-    csv = mean.rename("previsione_kg").to_frame().join(ci).to_csv().encode("utf-8")
+    csv = mean.rename("previsione_t").to_frame().join(ci).to_csv().encode("utf-8")
     st.download_button("Scarica previsione trimestrale (CSV)", csv, file_name=f"previsione_{material}.csv")
 
     with st.expander("Dettaglio backtest (ultimi trimestri, 1 passo avanti)"):
@@ -291,7 +314,7 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
             {"actual": bt["actuals"], "pred": bt["preds"]},
             index=bt["index"].astype(str),
         )
-        st.dataframe(bt_df.style.format("{:,.0f}"))
+        st.dataframe(bt_df.style.format("{:,.1f}"))
 
 st.divider()
 st.caption(

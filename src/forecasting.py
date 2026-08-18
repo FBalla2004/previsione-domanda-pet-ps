@@ -95,10 +95,17 @@ def grid_search_sarimax(y: pd.Series, exog: pd.DataFrame | None, seasonal_period
                     exog=exog_dt,
                     order=(p, d, q),
                     seasonal_order=(P, D, Q, s),
-                    enforce_stationarity=False,
-                    enforce_invertibility=False,
+                    enforce_stationarity=True,
+                    enforce_invertibility=True,
                 )
                 res = model.fit(disp=False)
+                if not res.mle_retvals.get("converged", True):
+                    continue
+                ar_params = [v for k, v in res.params.items() if k.startswith("ar.")]
+                if any(abs(v) > 0.97 for v in ar_params):
+                    # Coefficiente AR troppo vicino alla radice unitaria: fit degenere/instabile
+                    # (AIC apparentemente ottimo ma previsione non attendibile). Scartato.
+                    continue
                 if best is None or res.aic < best["aic"]:
                     best = {
                         "order": (p, d, q),
@@ -112,7 +119,7 @@ def grid_search_sarimax(y: pd.Series, exog: pd.DataFrame | None, seasonal_period
     if best is None:
         model = sm.tsa.statespace.SARIMAX(
             y_dt, exog=exog_dt, order=(0, 1, 0), seasonal_order=(0, 0, 0, 0),
-            enforce_stationarity=False, enforce_invertibility=False,
+            enforce_stationarity=True, enforce_invertibility=True,
         )
         res = model.fit(disp=False)
         best = {"order": (0, 1, 0), "seasonal_order": (0, 0, 0, 0), "aic": res.aic, "result": res}
@@ -134,7 +141,7 @@ def forecast_future(y: pd.Series, exog: pd.DataFrame | None, order, seasonal_ord
 
     model = sm.tsa.statespace.SARIMAX(
         y_dt, exog=exog_dt, order=order, seasonal_order=seasonal_order,
-        enforce_stationarity=False, enforce_invertibility=False,
+        enforce_stationarity=True, enforce_invertibility=True,
     )
     res = model.fit(disp=False)
     pred = res.get_forecast(steps=steps, exog=exog_future_dt)
@@ -165,7 +172,7 @@ def backtest(y: pd.Series, exog: pd.DataFrame | None, order, seasonal_order, n_t
         try:
             model = sm.tsa.statespace.SARIMAX(
                 y_train, exog=exog_train, order=order, seasonal_order=seasonal_order,
-                enforce_stationarity=False, enforce_invertibility=False,
+                enforce_stationarity=True, enforce_invertibility=True,
             )
             res = model.fit(disp=False)
             pred = res.get_forecast(steps=1, exog=exog_test).predicted_mean.iloc[0]

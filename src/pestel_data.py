@@ -28,8 +28,11 @@ ECONOMICO
   Lettura netta: la crescita dei consumi di yogurt/formaggi freschi e' un fattore di
   sostegno alla domanda di imballaggio PET/PS; la spinta a formati senza vassoio/carta e'
   un fattore di freno strutturale, distinto e aggiuntivo rispetto all'obbligo di contenuto
-  riciclato PPWR. Trattato qualitativamente (vedi 5.2 Limiti del lavoro): nessuna serie
-  numerica affidabile per includerlo come regressore stimato.
+  riciclato PPWR. La crescita di volume (media yogurt +5,4% / formaggi freschi +4,1% =
+  ~4,75%/anno) e' quantificata come LEVA DI SCENARIO (DAIRY_GROWTH_RATE_ANNUAL, regolabile
+  in dashboard), applicata in egual misura a vergine e riciclato: non e' un regressore
+  stimato nel SARIMAX (nessuna serie storica trimestrale disponibile per farlo rientrare
+  nella stima), ma una crescita composta imposta esplicitamente sulla previsione.
 
 POLITICO / AMBIENTALE
 - dummy_ppwr_forza: 0 prima di febbraio 2025, 1 da febbraio 2025 in poi (variabile stimabile
@@ -77,6 +80,11 @@ PPWR_RECYCLED_TARGET_2030 = {
     "PS": 10.0,
 }
 PPWR_TARGET_PERIOD = pd.Period("2030Q1", freq="Q")
+
+# Crescita annua composta del mercato di destinazione (lattiero-caseario), applicata in
+# egual misura a vergine e riciclato. Media tra crescita consumi yogurt (+5,4%) e formaggi
+# freschi (+4,1%), fonte Ismea Mercati 2025 (dati primi 7 mesi 2025 vs anno precedente).
+DAIRY_GROWTH_RATE_ANNUAL = 4.75
 
 
 def build_pestel_quarterly(q_index: pd.PeriodIndex) -> pd.DataFrame:

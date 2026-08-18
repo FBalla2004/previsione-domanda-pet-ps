@@ -101,8 +101,15 @@ def _last_complete_quarter(monthly_index: pd.DatetimeIndex) -> pd.Period:
     return last_q
 
 
+KG_PER_TONNE = 1000.0
+
+
 def build_dataset():
     """Ritorna (consumi_trimestrali_per_famiglia, consumi_trimestrali_per_sottocategoria, prezzo_trimestrale).
+
+    I consumi sono in TONNELLATE (il dato grezzo in Excel e' in kg, convertito qui una volta
+    per tutte cosi' che modello, metriche e dashboard lavorino tutti nella stessa unita').
+    Il prezzo materiale resta in EUR/kg, unita' standard per i prezzi di resina.
 
     I trimestri incompleti (mesi mancanti, tipicamente l'ultimo trimestre in corso) vengono
     esclusi per evitare di introdurre un crollo artificiale nella serie storica.
@@ -117,7 +124,7 @@ def build_dataset():
 
     common_idx = consumi_q.index.intersection(prezzo_q.index)
     common_idx = common_idx[common_idx <= last_ok_q]
-    consumi_q = consumi_q.loc[common_idx]
+    consumi_q = consumi_q.loc[common_idx] / KG_PER_TONNE
     prezzo_q = prezzo_q.loc[common_idx]
 
     famiglia_q = pd.DataFrame(index=consumi_q.index)

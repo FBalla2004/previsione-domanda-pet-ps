@@ -72,8 +72,8 @@ def _trend_text(y: pd.Series, mean: pd.Series) -> str:
     direzione = "in crescita" if pct > 2 else ("in calo" if pct < -2 else "sostanzialmente stabile")
     return (
         f"La previsione risulta **{direzione}**: la media dei primi trimestri previsti "
-        f"({fc_avg:,.0f} kg/trimestre) rispetto alla media degli ultimi 4 trimestri storici "
-        f"({hist_avg:,.0f} kg/trimestre) corrisponde a una variazione del **{pct:+.1f}%**."
+        f"({fc_avg:,.1f} t/trimestre) rispetto alla media degli ultimi 4 trimestri storici "
+        f"({hist_avg:,.1f} t/trimestre) corrisponde a una variazione del **{pct:+.1f}%**."
     )
 
 
@@ -194,18 +194,39 @@ def _reactivity_text(reactivity_pct: float) -> str | None:
             "semplice retta di tendenza lineare, calcolata sullo storico della serie. Stagionalità, "
             "regressori stimati e leve di scenario PESTEL sono completamente esclusi."
         )
-    if reactivity_pct < 100:
-        return (
-            f"**Reattività ai fattori di mercato impostata al {reactivity_pct:.0f}%**: la previsione è "
-            "stata resa più lineare, fondendo la stima del modello (stagionalità, regressori, leve di "
-            "scenario PESTEL) con una retta di tendenza storica pura. Più il valore è basso, più la "
-            "previsione si avvicina a una linea retta, sia nelle oscillazioni stagionali sia negli "
-            "effetti dei fattori esterni."
-        )
     return (
-        f"**Reattività ai fattori di mercato impostata al {reactivity_pct:.0f}%**: la previsione è stata "
-        "resa più reattiva, amplificando sia le oscillazioni stagionali sia l'effetto dei regressori "
-        "stimati e delle leve di scenario PESTEL rispetto alla retta di tendenza storica."
+        f"**Reattività ai fattori di mercato impostata al {reactivity_pct:.0f}%**: la previsione è "
+        "stata resa più lineare, fondendo la stima del modello (stagionalità, regressori, leve di "
+        "scenario PESTEL) con una retta di tendenza storica pura. Più il valore è basso, più la "
+        "previsione si avvicina a una linea retta, sia nelle oscillazioni stagionali sia negli "
+        "effetti dei fattori esterni."
+    )
+
+
+def dairy_growth_factor(growth_pct_annual: float, start_period: pd.Period, index: pd.PeriodIndex) -> pd.Series:
+    """Fattore di crescita composta dovuto all'espansione del mercato di destinazione
+    (lattiero-caseario), applicato in egual misura a vergine e riciclato: riflette la
+    crescita del volume totale imballato, non uno spostamento di composizione.
+    """
+    rate = growth_pct_annual / 100
+    vals = []
+    for p in index:
+        p_period = p if isinstance(p, pd.Period) else pd.Timestamp(p).to_period("Q")
+        years = (p_period.ordinal - start_period.ordinal) / 4
+        vals.append((1 + rate) ** years)
+    return pd.Series(vals, index=index)
+
+
+def _dairy_growth_text(dairy_growth_pct: float) -> str | None:
+    if dairy_growth_pct == 0:
+        return None
+    return (
+        f"**Crescita mercato lattiero-caseario ({dairy_growth_pct:.2f}%/anno)**: applicata come crescita "
+        "composta a tutta la previsione (vergine e riciclato in egual misura), sulla base della crescita "
+        "osservata nei consumi di yogurt (+5,4%) e formaggi freschi (+4,1%, fonte Ismea Mercati 2025) — "
+        "le categorie che tipicamente usano vaschette PET/PS. Per il materiale riciclato questo effetto "
+        "si somma a quello dell'obbligo di contenuto riciclato PPWR: la domanda di riciclato cresce sia "
+        "perché cresce il mercato totale sia perché ne cresce la quota obbligatoria."
     )
 
 
@@ -219,6 +240,7 @@ def build_explanation(
     s0: float | None,
     target_pct: float,
     ppwr_factor: pd.Series,
+    dairy_growth_pct: float,
     plastic_tax_scenario: bool,
     plastic_tax_impact: int,
     bt_mape: float,
@@ -239,6 +261,9 @@ def build_explanation(
         )
 
     scen_lines = [_ppwr_content_text(material, mtype, family, s0, target_pct, ppwr_factor)]
+    dairy_line = _dairy_growth_text(dairy_growth_pct)
+    if dairy_line:
+        scen_lines.append(dairy_line)
     if plastic_tax_scenario:
         tax_line = _plastic_tax_text(material, mtype, plastic_tax_impact)
         if tax_line:
