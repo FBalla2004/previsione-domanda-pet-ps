@@ -3,6 +3,8 @@ dal SARIMAX e alle leve di scenario PESTEL applicate (obbligo PPWR di contenuto 
 contesto di mercato lattiero-caseario).
 """
 
+from __future__ import annotations
+
 import pandas as pd
 
 from data_prep import MATERIAL_FAMILY, MATERIAL_TYPE

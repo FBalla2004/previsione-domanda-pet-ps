@@ -6,6 +6,8 @@ n_regressori <= n_osservazioni / 8, quindi tipicamente 2 regressori al massimo).
 La dashboard applica questo limite e avvisa l'utente se prova a superarlo.
 """
 
+from __future__ import annotations
+
 import itertools
 import warnings
 

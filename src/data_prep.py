@@ -1,5 +1,7 @@
 """Caricamento e aggregazione trimestrale dei dati storici di consumo e prezzo materiali."""
 
+from __future__ import annotations
+
 import re
 from pathlib import Path
 
