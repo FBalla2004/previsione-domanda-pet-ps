@@ -34,14 +34,20 @@ def load_data():
 
 famiglia_q, consumi_q, prezzo_q = load_data()
 
-MATERIAL_OPTIONS = {
-    "PET (totale)": dict(source=famiglia_q, column="PET", mtype="misto", family="PET"),
-    "PET vergine": dict(source=consumi_q, column="PET VG", mtype="vergine", family="PET"),
-    "PET scaglia (riciclato)": dict(source=consumi_q, column="SCAGLIA PET", mtype="riciclato", family="PET"),
-    "PS (totale)": dict(source=famiglia_q, column="PS", mtype="misto", family="PS"),
-    "PS vergine": dict(source=consumi_q, column="PS", mtype="vergine", family="PS"),
-    "PS scaglia (riciclato)": dict(source=consumi_q, column="PS SCAGLIA", mtype="riciclato", family="PS"),
-    "PE": dict(source=famiglia_q, column="PE", mtype="vergine", family="PE"),
+MATERIAL_TREE = {
+    "PET": {
+        "Totale": dict(source=famiglia_q, column="PET", mtype="misto"),
+        "Vergine": dict(source=consumi_q, column="PET VG", mtype="vergine"),
+        "Scaglia (riciclato)": dict(source=consumi_q, column="SCAGLIA PET", mtype="riciclato"),
+    },
+    "PS": {
+        "Totale": dict(source=famiglia_q, column="PS", mtype="misto"),
+        "Vergine": dict(source=consumi_q, column="PS", mtype="vergine"),
+        "Scaglia (riciclato)": dict(source=consumi_q, column="PS SCAGLIA", mtype="riciclato"),
+    },
+    "PE": {
+        "Totale": dict(source=famiglia_q, column="PE", mtype="vergine"),
+    },
 }
 
 st.title("Sistema di previsione della domanda — mercato plastico PET/PS")
@@ -96,9 +102,16 @@ in modo affidabile è ridotto (regola empirica: n. regressori ≤ n. osservazion
     )
 
 st.sidebar.header("Configurazione")
-material_label = st.sidebar.selectbox("Materiale", list(MATERIAL_OPTIONS.keys()), index=0)
-opt = MATERIAL_OPTIONS[material_label]
-data_source, material, mtype, family = opt["source"], opt["column"], opt["mtype"], opt["family"]
+family = st.sidebar.selectbox("Famiglia", list(MATERIAL_TREE.keys()), index=0)
+sub_tree = MATERIAL_TREE[family]
+if len(sub_tree) > 1:
+    sub_label = st.sidebar.selectbox("Tipo", list(sub_tree.keys()), index=0)
+else:
+    sub_label = next(iter(sub_tree))
+
+opt = sub_tree[sub_label]
+data_source, material, mtype = opt["source"], opt["column"], opt["mtype"]
+material_label = family if sub_label == "Totale" else f"{family} {sub_label.lower()}"
 y = data_source[material].astype(float)
 y.name = material
 
