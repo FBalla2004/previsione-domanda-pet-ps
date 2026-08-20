@@ -74,7 +74,7 @@ def _trend_line(y: pd.Series, mean: pd.Series) -> str:
         return ""
     pct = (fc_avg / hist_avg - 1) * 100
     direzione = "in crescita" if pct > 2 else ("in calo" if pct < -2 else "stabile")
-    return f"Previsione **{direzione}**: {pct:+.1f}% rispetto alla media degli ultimi 4 trimestri."
+    return f"Previsione **{direzione}** ({pct:+.0f}%)."
 
 
 def _regressor_lines(res, exog_cols) -> list[str]:
@@ -85,26 +85,23 @@ def _regressor_lines(res, exog_cols) -> list[str]:
         coef = res.params[col]
         label = PESTEL_LABELS.get(col, col)
         segno = "positivo" if coef > 0 else "negativo"
-        lines.append(f"{label}: effetto {segno} sulla domanda.")
+        lines.append(f"{label}: effetto {segno}.")
     return lines
 
 
-def _ppwr_line(material: str, mtype: str, family: str, s0: float | None,
+def _ppwr_line(mtype: str, family: str, s0: float | None,
                target_pct: float, factor_series: pd.Series) -> str:
     if mtype == "misto":
-        return "Obbligo riciclato PPWR: effetto neutro sul totale (sposta vergine → riciclato, non il volume)."
+        return "PPWR: neutro sul totale (sposta vergine → riciclato)."
     if mtype == "macinato_interno":
-        return "Obbligo riciclato PPWR: non applicabile (macinato interno)."
+        return "PPWR: non applicabile."
     if s0 is None:
-        return f"Obbligo riciclato PPWR: nessun target normativo individuato per {family}."
+        return f"PPWR: nessun target per {family}."
 
     target_year = PPWR_TARGET_PERIOD.year
     effetto = (factor_series.iloc[-1] - 1) * 100
     segno = "+" if effetto >= 0 else ""
-    return (
-        f"Obbligo riciclato PPWR: {family} da {s0*100:.0f}% a {target_pct:.0f}% entro il {target_year} → "
-        f"{segno}{effetto:.0f}% sulla domanda di {TYPE_LABELS.get(mtype, mtype)}."
-    )
+    return f"PPWR: {segno}{effetto:.0f}% ({TYPE_LABELS.get(mtype, mtype)}) entro il {target_year}."
 
 
 def _plastic_tax_line(mtype: str, plastic_tax_impact: int) -> str | None:
@@ -112,7 +109,7 @@ def _plastic_tax_line(mtype: str, plastic_tax_impact: int) -> str | None:
     if sign == 0:
         return None
     effective = plastic_tax_impact * sign
-    return f"Plastic Tax IT (dal 2027): {effective:+d}% sulla domanda."
+    return f"Plastic Tax IT: {effective:+d}%."
 
 
 def build_explanation(
@@ -135,16 +132,16 @@ def build_explanation(
     if trend:
         lines.append(trend)
     if reactivity_pct < 100:
-        lines.append(f"Reattività al {reactivity_pct:.0f}%: previsione più lineare (meno stagionalità/fattori esterni).")
+        lines.append(f"Reattività {reactivity_pct:.0f}%: previsione più lineare.")
 
     lines.extend(_regressor_lines(res, exog_cols))
-    lines.append(_ppwr_line("il materiale", mtype, family, s0, target_pct, ppwr_factor))
+    lines.append(_ppwr_line(mtype, family, s0, target_pct, ppwr_factor))
     if dairy_growth_pct:
-        lines.append(f"Crescita mercato lattiero-caseario: +{dairy_growth_pct:.2f}%/anno su tutta la domanda.")
+        lines.append(f"Mercato lattiero-caseario: +{dairy_growth_pct:.2f}%/anno.")
     if plastic_tax_scenario:
         tax_line = _plastic_tax_line(mtype, plastic_tax_impact)
         if tax_line:
             lines.append(tax_line)
 
-    body = "\n".join(f"- {line}" for line in lines[1:] if line)
-    return f"{lines[0]}\n\n{body}" if lines else ""
+    body = "  \n".join(f"- {line}" for line in lines[1:] if line)
+    return f"{lines[0]}  \n{body}" if lines else ""

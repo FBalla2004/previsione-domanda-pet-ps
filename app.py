@@ -261,10 +261,6 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
     r = st.session_state["result"]
     bt, mean, ci = r["bt"], r["mean"], r["ci"]
 
-    c1, c2 = st.columns(2)
-    c1.metric("MAPE backtest", f"{bt['mape']:.1f}%")
-    c2.metric("RMSE backtest", f"{bt['rmse']:,.1f} t")
-
     st.subheader("Previsione")
     fc_fig = go.Figure()
     fc_fig.add_trace(
@@ -273,10 +269,17 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
     lower_col = [c for c in ci.columns if c.startswith("lower")][0]
     upper_col = [c for c in ci.columns if c.startswith("upper")][0]
     fc_x = mean.index.astype(str)
+    last_hist_x = y.index.to_timestamp().astype(str)[-1]
+    last_hist_y = y.values[-1]
+
+    # Punto storico finale ripetuto come primo punto della previsione, per unire visivamente le due serie.
+    band_x = [last_hist_x] + list(fc_x)
+    band_upper = [last_hist_y] + list(ci[upper_col])
+    band_lower = [last_hist_y] + list(ci[lower_col])
     fc_fig.add_trace(
         go.Scatter(
-            x=list(fc_x) + list(fc_x[::-1]),
-            y=list(ci[upper_col]) + list(ci[lower_col][::-1]),
+            x=band_x + band_x[::-1],
+            y=band_upper + band_lower[::-1],
             fill="toself",
             fillcolor="rgba(99,110,250,0.15)",
             line=dict(color="rgba(255,255,255,0)"),
@@ -284,7 +287,12 @@ if "result" in st.session_state and st.session_state["result"]["material"] == ma
             showlegend=True,
         )
     )
-    fc_fig.add_trace(go.Scatter(x=fc_x, y=mean.values, mode="lines+markers", name="Previsione"))
+    fc_fig.add_trace(
+        go.Scatter(
+            x=[last_hist_x] + list(fc_x), y=[last_hist_y] + list(mean.values),
+            mode="lines+markers", name="Previsione",
+        )
+    )
     fc_fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="tonnellate")
     st.plotly_chart(fc_fig, use_container_width=True)
 
