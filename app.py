@@ -15,14 +15,7 @@ from forecasting import (  # noqa: E402
     grid_search_sarimax,
     max_recommended_regressors,
 )
-from narrative import (  # noqa: E402
-    TYPE_LABELS,
-    build_explanation,
-    dairy_growth_factor,
-    material_family,
-    material_type,
-    ppwr_content_factor,
-)
+from narrative import TYPE_LABELS, build_explanation, dairy_growth_factor, ppwr_content_factor  # noqa: E402
 from pestel_data import (  # noqa: E402
     DAIRY_GROWTH_RATE_ANNUAL,
     PESTEL_CATEGORY,
@@ -41,6 +34,16 @@ def load_data():
 
 famiglia_q, consumi_q, prezzo_q = load_data()
 
+MATERIAL_OPTIONS = {
+    "PET (totale)": dict(source=famiglia_q, column="PET", mtype="misto", family="PET"),
+    "PET vergine": dict(source=consumi_q, column="PET VG", mtype="vergine", family="PET"),
+    "PET scaglia (riciclato)": dict(source=consumi_q, column="SCAGLIA PET", mtype="riciclato", family="PET"),
+    "PS (totale)": dict(source=famiglia_q, column="PS", mtype="misto", family="PS"),
+    "PS vergine": dict(source=consumi_q, column="PS", mtype="vergine", family="PS"),
+    "PS scaglia (riciclato)": dict(source=consumi_q, column="PS SCAGLIA", mtype="riciclato", family="PS"),
+    "PE": dict(source=famiglia_q, column="PE", mtype="vergine", family="PE"),
+}
+
 st.title("Sistema di previsione della domanda — mercato plastico PET/PS")
 st.caption(
     "Tesi — pianificazione della produzione (Coexpan). Modello statistico SARIMAX con "
@@ -53,7 +56,9 @@ with st.expander("Metodologia e fonti dei dati PESTEL", expanded=False):
 **Dati storici (endogeni)**: consumi mensili di materia prima (convertiti in tonnellate) per
 PET VG, SCAGLIA PET, DA MAC PET, PS, PS SCAGLIA, PE — aggregati a trimestri completi
 (ottobre 2021 - giugno 2026). Il trimestre in corso, incompleto, viene escluso per non
-introdurre un crollo artificiale.
+introdurre un crollo artificiale. DA MAC PET (macinato interno) è incluso nei totali di
+famiglia ma non è selezionabile singolarmente: non è chiaramente equiparabile al riciclato
+post-consumo rilevante per l'obbligo PPWR.
 
 **Regressore economico** (stimato nel modello): prezzo materiale (EUR/kg), dato interno
 aziendale. Prezzo Brent e cambio EUR/USD sono stati volutamente esclusi: per un
@@ -91,23 +96,14 @@ in modo affidabile è ridotto (regola empirica: n. regressori ≤ n. osservazion
     )
 
 st.sidebar.header("Configurazione")
-level = st.sidebar.radio("Livello di dettaglio", ["Famiglia (PET/PS/PE)", "Sottocategoria"])
-if level == "Famiglia (PET/PS/PE)":
-    series_options = list(famiglia_q.columns)
-    data_source = famiglia_q
-else:
-    series_options = list(consumi_q.columns)
-    data_source = consumi_q
-
-default_idx = series_options.index("PET") if "PET" in series_options else 0
-material = st.sidebar.selectbox("Materiale", series_options, index=default_idx)
+material_label = st.sidebar.selectbox("Materiale", list(MATERIAL_OPTIONS.keys()), index=0)
+opt = MATERIAL_OPTIONS[material_label]
+data_source, material, mtype, family = opt["source"], opt["column"], opt["mtype"], opt["family"]
 y = data_source[material].astype(float)
 y.name = material
 
 n_obs = len(y)
 max_reg = max_recommended_regressors(n_obs)
-mtype = material_type(material)
-family = material_family(material)
 st.sidebar.markdown(f"**Osservazioni disponibili:** {n_obs} trimestri")
 st.sidebar.markdown(f"**Regressori consigliati (max):** {max_reg}")
 st.sidebar.markdown(f"**Tipo materiale:** {TYPE_LABELS.get(mtype, mtype)}")
@@ -184,11 +180,11 @@ plastic_tax_impact = (
     else 0
 )
 
-st.subheader(f"Storico trimestrale — {material}")
+st.subheader(f"Storico trimestrale — {material_label}")
 hist_fig = go.Figure()
 hist_fig.add_trace(
     go.Scatter(
-        x=y.index.to_timestamp().astype(str), y=y.values, mode="lines+markers", name=material
+        x=y.index.to_timestamp().astype(str), y=y.values, mode="lines+markers", name=material_label
     )
 )
 hist_fig.update_layout(height=350, margin=dict(l=10, r=10, t=30, b=10), yaxis_title="tonnellate")
@@ -238,24 +234,23 @@ if run:
         mean_final, ci_final = apply_reactivity(mean_adj, ci_adj, y, reattivita)
 
         explanation = build_explanation(
-            material=material, y=y, mean=mean_final, res=res, exog_cols=selected_regressors,
-            future_exog=future_exog, s0=s0, target_pct=target_pct, ppwr_factor=ppwr_factor,
-            dairy_growth_pct=dairy_growth_pct, plastic_tax_scenario=plastic_tax_scenario,
-            plastic_tax_impact=plastic_tax_impact, bt_mape=bt["mape"], reactivity_pct=reattivita,
+            mtype=mtype, family=family, y=y, mean=mean_final, res=res, exog_cols=selected_regressors,
+            s0=s0, target_pct=target_pct, ppwr_factor=ppwr_factor, dairy_growth_pct=dairy_growth_pct,
+            plastic_tax_scenario=plastic_tax_scenario, plastic_tax_impact=plastic_tax_impact,
+            reactivity_pct=reattivita,
         )
 
         st.session_state["result"] = dict(
-            best=best, bt=bt, mean=mean_final, ci=ci_final, material=material, y=y, explanation=explanation
+            bt=bt, mean=mean_final, ci=ci_final, material=material_label, y=y, explanation=explanation
         )
 
-if "result" in st.session_state and st.session_state["result"]["material"] == material:
+if "result" in st.session_state and st.session_state["result"]["material"] == material_label:
     r = st.session_state["result"]
-    best, bt, mean, ci = r["best"], r["bt"], r["mean"], r["ci"]
+    bt, mean, ci = r["bt"], r["mean"], r["ci"]
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Ordine SARIMA scelto", f"{best['order']} x {best['seasonal_order']}")
-    c2.metric("MAPE backtest", f"{bt['mape']:.1f}%")
-    c3.metric("RMSE backtest", f"{bt['rmse']:,.1f} t")
+    c1, c2 = st.columns(2)
+    c1.metric("MAPE backtest", f"{bt['mape']:.1f}%")
+    c2.metric("RMSE backtest", f"{bt['rmse']:,.1f} t")
 
     st.subheader("Previsione")
     fc_fig = go.Figure()
