@@ -73,13 +73,15 @@ questi effetti macro, e includerli avrebbe saturato il budget di regressori stim
 (max ~2 con 19 osservazioni) senza aggiungere potere esplicativo diretto.
 
 **Mercato di destinazione (lattiero-caseario)**: l'azienda produce prevalentemente
-imballaggi per yogurt e formaggi freschi. Dati Ismea Mercati/Mordor Intelligence 2025
-mostrano consumi in crescita in queste categorie (yogurt +5,4%, formaggi freschi +4,1%)
-ma anche una spinta strutturale della GDO verso formati senza vassoio/carta. La crescita
-di volume (media yogurt/formaggi freschi ≈ 4,75%/anno) è inclusa come **leva di scenario
-quantificata** (non stimata nel modello, varianza storica nulla), applicata in egual
-misura a vergine e riciclato perché riflette la crescita del volume totale imballato, non
-uno spostamento di composizione.
+imballaggi per yogurt e formaggi freschi. Il dato più recente disponibile (Ismea Mercati,
+report I semestre 2025, pubblicato novembre 2025) mostra consumi in volume in crescita in
+queste categorie (yogurt +5,7%, formaggi freschi +5,3%) ma anche una spinta strutturale
+della GDO verso formati senza vassoio/carta. La crescita di volume (media yogurt/formaggi
+freschi ≈ 5,5%/anno) è inclusa come **leva di scenario quantificata** (non stimata nel
+modello, varianza storica nulla), applicata in egual misura a vergine e riciclato perché
+riflette la crescita del volume totale imballato, non uno spostamento di composizione.
+Il valore è regolabile in dashboard, anche in negativo, per simulare una contrazione del
+mercato di destinazione.
 
 **Regressori politico/ambientali**: PPWR in vigore dall'11/02/2025 (Regolamento UE
 2025/40) è stimato nel modello. L'**obbligo di contenuto riciclato PPWR** (30% PCR per il
@@ -165,11 +167,14 @@ st.sidebar.caption(
 )
 
 dairy_growth_pct = st.sidebar.slider(
-    "Crescita mercato lattiero-caseario (%/anno)", 0.0, 15.0, DAIRY_GROWTH_RATE_ANNUAL, step=0.25,
+    "Crescita mercato lattiero-caseario (%/anno)", -15.0, 15.0, DAIRY_GROWTH_RATE_ANNUAL, step=0.25,
     help=(
-        "Crescita composta annua applicata a tutta la domanda (vergine e riciclato in egual "
-        "misura). Default = media crescita consumi yogurt (+5,4%) e formaggi freschi (+4,1%), "
-        "fonte Ismea Mercati 2025 — le due categorie che usano tipicamente vaschette PET/PS."
+        "Crescita (o contrazione, se negativa) composta annua applicata a tutta la domanda "
+        "(vergine e riciclato in egual misura). Default = media crescita consumi yogurt "
+        "(+5,7%) e formaggi freschi (+5,3%), fonte Ismea Mercati, report I semestre 2025 "
+        "(il più recente disponibile) — le due categorie che usano tipicamente vaschette "
+        "PET/PS. Riduci o porta in negativo per simulare un rallentamento o una contrazione "
+        "del mercato di destinazione."
     ),
 )
 

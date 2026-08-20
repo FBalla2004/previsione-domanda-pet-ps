@@ -14,12 +14,14 @@ ECONOMICO
 - Mercato di destinazione (lattiero-caseario): l'azienda produce prevalentemente imballaggi
   per il settore lattiero-caseario (vaschette/vasetti PET-PS per yogurt, formaggi freschi).
   Non esiste una serie trimestrale pubblica granulare integrabile nel SARIMAX, ma i dati
-  di mercato disponibili (fonti: Ismea Mercati, Mordor Intelligence, Italia Imballaggio,
-  luglio-agosto 2025) sono un riferimento qualitativo importante:
-  - Spesa delle famiglie italiane in lattiero-caseario: +6,6% nei primi 7 mesi del 2025.
-  - Consumi in volume: yogurt +5,4%, formaggi freschi +4,1% (categorie che usano tipicamente
-    vaschette termoformate PET/PS) — mentre latte fresco -3,3% e UHT -1,2% (packaging
-    diverso, cartone/HDPE, meno rilevante per PET/PS).
+  di mercato disponibili (fonte principale: Ismea Mercati, report "Consumi alimentari delle
+  famiglie - primo semestre 2025", pubblicato novembre 2025 — il piu' recente disponibile)
+  sono un riferimento qualitativo e quantitativo importante:
+  - Spesa delle famiglie italiane in lattiero-caseario: +6,3% nel primo semestre 2025.
+  - Consumi in volume (H1 2025 vs H1 2024): yogurt +5,7%, formaggi freschi +5,3% (categorie
+    che usano tipicamente vaschette termoformate PET/PS) — mentre latte fresco -3,9% e
+    formaggi duri sostanzialmente stabili (-0,4%), packaging diverso, meno rilevante per
+    PET/PS.
   - Mercato lattiero-caseario italiano: CAGR atteso 5,83% fino al 2031 (Mordor Intelligence),
     trainato da mozzarella e Parmigiano-Reggiano.
   - La plastica resta il materiale predominante negli imballaggi lattiero-caseari (quota
@@ -28,11 +30,13 @@ ECONOMICO
   Lettura netta: la crescita dei consumi di yogurt/formaggi freschi e' un fattore di
   sostegno alla domanda di imballaggio PET/PS; la spinta a formati senza vassoio/carta e'
   un fattore di freno strutturale, distinto e aggiuntivo rispetto all'obbligo di contenuto
-  riciclato PPWR. La crescita di volume (media yogurt +5,4% / formaggi freschi +4,1% =
-  ~4,75%/anno) e' quantificata come LEVA DI SCENARIO (DAIRY_GROWTH_RATE_ANNUAL, regolabile
-  in dashboard), applicata in egual misura a vergine e riciclato: non e' un regressore
-  stimato nel SARIMAX (nessuna serie storica trimestrale disponibile per farlo rientrare
-  nella stima), ma una crescita composta imposta esplicitamente sulla previsione.
+  riciclato PPWR. La crescita di volume (media yogurt +5,7% / formaggi freschi +5,3% =
+  ~5,5%/anno, dato H1 2025, il piu' aggiornato reperibile) e' quantificata come LEVA DI
+  SCENARIO (DAIRY_GROWTH_RATE_ANNUAL, regolabile in dashboard anche in negativo per
+  simulare una contrazione del mercato di destinazione), applicata in egual misura a
+  vergine e riciclato: non e' un regressore stimato nel SARIMAX (nessuna serie storica
+  trimestrale disponibile per farlo rientrare nella stima), ma una crescita/contrazione
+  composta imposta esplicitamente sulla previsione.
 
 POLITICO / AMBIENTALE
 - dummy_ppwr_forza: 0 prima di febbraio 2025, 1 da febbraio 2025 in poi (variabile stimabile
@@ -82,9 +86,10 @@ PPWR_RECYCLED_TARGET_2030 = {
 PPWR_TARGET_PERIOD = pd.Period("2030Q1", freq="Q")
 
 # Crescita annua composta del mercato di destinazione (lattiero-caseario), applicata in
-# egual misura a vergine e riciclato. Media tra crescita consumi yogurt (+5,4%) e formaggi
-# freschi (+4,1%), fonte Ismea Mercati 2025 (dati primi 7 mesi 2025 vs anno precedente).
-DAIRY_GROWTH_RATE_ANNUAL = 4.75
+# egual misura a vergine e riciclato. Media tra crescita consumi yogurt (+5,7%) e formaggi
+# freschi (+5,3%), fonte Ismea Mercati, report primo semestre 2025 (pubblicato nov. 2025,
+# il piu' aggiornato disponibile). Regolabile in dashboard anche in negativo.
+DAIRY_GROWTH_RATE_ANNUAL = 5.5
 
 
 def build_pestel_quarterly(q_index: pd.PeriodIndex) -> pd.DataFrame:
